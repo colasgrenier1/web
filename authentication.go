@@ -5,8 +5,9 @@ import (
 	"time"
 )
 
+
 type Session struct {
-	id			integer
+	id		integer
 	active		boolean
 	username	string
 	address		string //ip address, etc.
@@ -21,6 +22,7 @@ fn GetURLEncodedSessionID(id integer) {
 //Manages sessions
 type SessionManager {
 	csvFile		csv.Writer
+	database	Database
 	sessions	[]Session
 	timeout		integer //number of seconds between each request until termination of account.
 }
