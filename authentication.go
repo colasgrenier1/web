@@ -7,11 +7,11 @@ import (
 
 
 type Session struct {
-	id		integer
+	id		integer		//session id
 	active		boolean
-	username	string
-	address		string //ip address, etc.
-	hash		string//cookie value
+	user		int		//user id
+	address		string		//ip address, etc.
+	hash		string		//cookie value
 	last		Time
 }
 
@@ -29,7 +29,8 @@ type SessionManager {
 
 //Login: returns cookie value
 fn (db SessionManager) Login (username string, password string, address string) {
-	
+	//We check
+	id, 
 }
 
 //Access: returns the username (or nil) and the cookie value to be set (or nil)
