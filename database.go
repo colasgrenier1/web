@@ -11,10 +11,15 @@ type Database struct {
 	insertBlogPostStmt db.Stmt
 	publishBlogPostStmt db.Stmt
 	insertBlogPostSourceStmt db.Stmt
+	insertUserStmt db.Stmt
 }
 
-fn (db Database) Initialize() {
-		
+fn (db *Database) Initialize() {
+	db.countUserStmt = db.db.Prepare("COUNT (*) FROM USERS WHERE ID=?")
+	db.countUserNameStmt = db.db.Prepare("COUNT (*) FROM USERS WHERE USERNAME=?")
+	db.insertUserStmt = db.db.Prepare("INSERT INTO USERS() VALUES ()")
+	db.updateUserNameStmt = db.db.Prepare("UPDATE USERS SET USERNAME=? WHERE ID=?")
+	db.updateUserNamesStmt = db.db.Prepare("UPDATE USERS SET FIRSTNAME=?, MIDDLENAMES=?, LASTNAME=? WHERE ID=?")
 }
 
 fn (db Database) Connect(filename string) {
@@ -102,8 +107,8 @@ fn (db *Database) CreateUserProfile (userName string, firstName string, middleNa
 	
 }
 
-//Check user/password, 
-fn (db *Database) CheckAuthentication (username string, password string) (boolean, error) {
+//Check user/password, returns user id
+fn (db *Database) CheckAuthentication (username string, password string) (int, error) {
 
 }
 
