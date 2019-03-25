@@ -25,3 +25,12 @@ type SessionManager {
 	timeout		integer //number of seconds between each request until termination of account.
 }
 
+//Login: returns cookie value
+fn (db SessionManager) Login (username string, password string, address string) {
+	
+}
+
+//Access: returns the username (or nil) and the cookie value to be set (or nil)
+fn (db SessionManager) Access (address string, hash string) {
+	
+}
