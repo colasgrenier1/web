@@ -1,0 +1,187 @@
+body {
+	font-family: "IBM Plex Serif"
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+/*
+ *  M A I N   F R A M E
+ */
+div.mainframe {
+	display: table;
+	max-width: 70ch;
+	margin: auto;
+	hyphens: auto;
+	line-height: 1.6;
+}
+
+/*
+ *  S T A T U S   B A R
+ */
+
+div.statusbar {
+	width: 100%;
+	padding: 0;
+	margin: 0;
+	font-family: "IBM Plex Mono", monospace;
+	overflow: hidden;
+}
+
+ul.statusbar {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+
+ul.statusbar li {
+	margin: 0;
+	padding: 0;
+	display: inline;
+	text-decoration: none;
+	float: left;
+}
+
+/*
+ *  H E A D E R
+ */
+
+div.header {
+
+}
+
+h1.headertitle {
+	text-align: center;
+	font-weight: normal;
+	font-size: 250%;
+	letter-spacing: 4px;
+}
+
+ul.headernavbar {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: block;
+	overflow: hidden;
+}
+
+ul.headernavbar li {
+	margin: 0;
+	padding: 0;
+	padding-right: 14px;
+	text-decoration: none;
+	float: left;
+	display: inline;
+}
+
+input.headersearch {
+	border: 0;
+	border-bottom: 1px solid #AAA;
+	width: 100%;
+	float: right;
+}
+
+ul.headernavbar input:hover {
+	border-bottom: 1px solid #000;
+}
+
+ul.headernavbar input:focus {
+	border-bottom: 1px solid #000;
+}
+
+button.headersearchbutton {
+	float: left;
+	display: inline;
+}
+
+/*
+ *  B O T T O M   B A R
+ */
+div.bottombar {
+
+}
+
+ul.bottombar {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: block;
+}
+
+ul.bottombar li {
+	margin: 0;
+	padding: 0;
+	padding-right: 14px;
+	text-decoration: none;
+	float: left;
+}
+
+/*
+ *  E R R O R   A R E A
+ */
+div.errortable {
+	font-family: "IBM Plex Mono";
+	color: red;
+}
+
+/*
+ *  B L O G   P O S T   B O D Y
+ */
+div.blogpostbody {
+	text-align:justify;
+	hyphens: auto;
+	line-height: 170%;
+}
+
+div.blogpostbody h1 {
+	font-weight: normal;
+	font-size: 250%;
+}
+
+div.blogpostbody h2 {
+	font-weight: normal;
+	font-size: 250%;
+}
+
+div.blogpostbody h3 {
+	font-weight: normal;
+	font-size: 250%;
+}
+
+div.blogpostbody h4 {
+	font-weight: normal;
+	font-size: 250%;
+}
+
+/*
+ *  N E W   B L O G   P O S T
+ */
+div.newblogpost {
+	display: block;
+	height: 100%;
+}
+
+input.newblogposttitle {
+	font-family: "IBM Plex Mono";
+	border: 0;
+	border-bottom: 1px solid #AAA;
+	font-size: 100%;
+	width: 100%;
+}
+
+input.newblogposttitle:focus {
+	border-bottom: 1px solid #000;
+}
+
+div.newblogpost textarea {
+	font-family: "IBM Plex Mono";
+	width: 100%;
+	resize: none;
+	height: auto;
+	font-size: 100%;
+}

@@ -1,0 +1,32 @@
+*
+*   W E B   S Y S T E M   C O N F I G U R A T I O N   F I L E
+*
+* COLUMN(S)     VALUE
+* 0             Comment: if any character is here, the line is ignored
+* 1-25          Field name (24 characters)
+* 26-80         Field value (55 characters)
+*
+* Lines can only be 80 characters... max
+* Do not leave lines with only spaces!
+*
+*<-FIELDNAME------------><-VALUE----------------------------------------------->
+
+*Port to serve on.
+ PORT                    6000
+
+*Max timeout for a session, in seconds
+ SESSIONTIMEOUT          600
+
+*
+* L O G G I N G
+*
+ LOGFILE                 /home/nicolas/www/log/log
+
+*
+* D A T A B A S E   P A R A M E T E R S
+*
+ DATABASEUSERNAME        postgres
+ DATABASEPASSWORD        postgres
+ DATABASEADDRESS         localhost
+ DATABASEPORT            5432
+ DATABASENAME            www
