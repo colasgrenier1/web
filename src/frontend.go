@@ -23,6 +23,7 @@ func WriteGeneralHeader(w http.ResponseWriter, title string, username string) {
 	<HEAD>
 		<TITLE>%title%</TITLE>
 		<LINK REL="stylesheet" HREF="/static/style.css">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 		<link href="https://fonts.googleapis.com/css?family=IBM+Plex+Serif:400,400i,700&amp;subset=latin-ext" rel="stylesheet">
 	</HEAD>
 	<BODY>
@@ -33,18 +34,33 @@ func WriteGeneralHeader(w http.ResponseWriter, title string, username string) {
 					<LI STYLE="float:right;">%userorlogin%</LI>
 				</UL>
 			</DIV>
+			<SCRIPT>
+				//taken from https://www.w3schools.com/howto/howto_js_topnav_responsive.asp
+				function resizeHeaderNavBar() {
+					var x = document.getElementById("headernavbar")
+						if (x.className == "headernavbar") {
+							x.className += "responsive"
+						} else {
+							x.className = "headernavbar"
+						}
+				}
+			</SCRIPT>
 			<DIV CLASS="header">
 				<H1 CLASS="headertitle">NICOLAS GRENIER</H1>
-				<UL CLASS="headernavbar">
-					<LI><A HREF="/blog">BLOG</A></LI>
-					<LI><A HREF="/notes">NOTES</A></LI>
-					<LI><A HREF="/projects">PROJECTS</A></LI>
-					<LI><A HREF="/texts">TEXTS</A></LI>
-					<LI><FORM ACTION="/search">
-						<INPUT TYPE="text" CLASS="headersearch" PLACEHOLDER="Search">
-						<BUTTON TYPE="sumbit" CLASS="headersearchbutton"><IMG SRC="/static/s.svg" ALT="Search"></BUTTON>
-						</FORM></LI>
-				</UL>
+				<DIV CLASS="headernavbar" ID="headernavbar">
+					<A HREF="/" CLASS="active">HOME</A>
+					<A HREF="/blog">BLOG</A>
+					<A HREF="/notes">NOTES</A>
+					<A HREF="/projects">PROJECTS</A>
+					<A HREF="/texts">TEXTS</A>
+					<FORM ACTION="/search" METHOD="post">
+						<INPUT TYPE="text" CLASS="headersearch" PLACEHOLDER="Search" name="search" ID="search">
+						<BUTTON TYPE="submit"><I CLASS="fa fa-search"></I></BUTTON>
+					</FORM>
+					<A HREF="javascript:void(0);" CLASS="icon" ONCLICK="resizeHeaderNavBar()">
+						<I CLASS="fa fa-bars"></I>
+					</A>
+				</DIV>
 			</DIV>
 			<DIV CLASS="content">
 `
@@ -70,6 +86,20 @@ func WriteGeneralTrailer(w http.ResponseWriter) {
 	</DIV>
 	</DIV>
 	</HTML>`))
+}
+
+//Write error
+func WriteError(w http.ResponseWriter, err error) {
+	var b bytes.Buffer
+	b.WriteString("<!DOCTYPE HTML>\n<HTML>\n<HEAD>\n<TITLE>ERROR</TITLE>\n")
+	b.WriteString("<LINK REL=\"stylesheet\" HREF=\"/static/style.css\">")
+	b.WriteString("</HEAD>\n<BODY>\n")
+	b.WriteString("<DIV CLASS=\"errorcontainer\">\n")
+	b.WriteString("<H1>* * *  ERROR  * * *</H1>")
+	b.WriteString("<P>One or more errors occured while fetching the ressource.</P>\n")
+	b.WriteString(fmt.Sprintf("<P CLASS=\"errorline\">%s</P>\n",err.Error()))
+	b.WriteString("</DIV>\n</BODY>\n</HTML>")
+	w.Write(b.Bytes())
 }
 
 //writes the blog post body
@@ -118,13 +148,14 @@ func WriteNewBlogPost(w http.ResponseWriter, title string, shortTitle string, bo
 		sb.WriteString("</DIV>\n")
 	}
 	//Write out the title
-	sb.WriteString("<FORM CLASS=\"newblogpost\">\n")
+	//sb.WriteString("<FORM CLASS=\"newblogpost\" ACTION=\"http://localhost:8080/newblogpost\" METHOD=\"post\">\n")
+	sb.WriteString("<FORM CLASS=\"newblogpost\" ACTION=\"/newblogpost\" METHOD=\"post\">\n")
 	sb.WriteString(fmt.Sprintf("<LABEL FOR=\"title\">Title</LABEL>\n"))
-	sb.WriteString(fmt.Sprintf("<INPUT CLASS=\"newblogposttitle\" ID=\"title\" VALUE=\"%s\"><BR>\n", title))
+	sb.WriteString(fmt.Sprintf("<INPUT CLASS=\"newblogposttitle\" ID=\"title\" NAME=\"title\" VALUE=\"%s\"><BR>\n", title))
 	sb.WriteString(fmt.Sprintf("<LABEL FOR=\"shorttitle\">Short Title</LABEL>\n"))
-	sb.WriteString(fmt.Sprintf("<INPUT CLASS=\"newblogposttitle\" ID=\"shorttitle\" VALUE=\"%s\">\n", shortTitle))
+	sb.WriteString(fmt.Sprintf("<INPUT CLASS=\"newblogposttitle\" ID=\"shorttitle\" NAME=\"shorttitle\" VALUE=\"%s\">\n", shortTitle))
 	//Write out the body
-	sb.WriteString("<TEXTAREA ID=\"body\" ROWS=\"25\">")
+	sb.WriteString("<TEXTAREA ID=\"body\" ROWS=\"25\" NAME=\"body\">")
 	sb.WriteString(body)
 	sb.WriteString("</TEXTAREA>\n")
 	//Write out the formatter selector

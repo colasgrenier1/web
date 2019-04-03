@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"regexp"
 	"net/http"
+	"net/http/httputil"
 	"strconv"
-	"time"
+	//"time"
+	"errors"
 )
 
 //Static regexes for dispatching
@@ -22,17 +24,19 @@ var textRegex = regexp.MustCompile(``)
 
 //Server structure
 type Server struct {
-	//db Database
+	db *Database
 	srv *http.Server
 }
 
-func (srv *Server) Initialize(port int) {
+func (srv *Server) Initialize(port int, databasePath string, databasePort int, username string, password string, database string) error {
 	//We are our own handler
 	srv.srv = &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: srv}
+	srv.db = &Database{}
+	return srv.db.Connect(databasePath, databasePort, username, password, database)
 }
 
-func (srv *Server) Run() {
-	srv.srv.ListenAndServe()
+func (srv *Server) Run() error {
+	return srv.srv.ListenAndServe()
 }
 
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -74,12 +78,17 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, fmt.Sprintf("/home/nicolas/www/static/%s", s[1]))
 	} else if method=="GET" && path=="/newblogpost" {
 		srv.ServeNewBlogPost(w, r)
-	} else if method=="POST" && path=="/newpost" {
-		srv.CreateBlogPost(w, r)
+	} else if method=="POST" && path=="/newblogpost" {
+		srv.ServeReflection(w, r)
+		//srv.CreateBlogPost(w, r)
 	} else if method=="POST" && path=="/newblogpostcomment" {
 	} else if method=="POST" && path=="/likeblogpost" {
 	} else if (method=="GET"||method=="POST") && path=="/editblogpost" {
 	} else if method=="POST" && path=="/likeblogpost" {
+	} else if method=="POST" && path=="/search" {
+		srv.ServeSearch(w, r)
+	} else if path=="/error" {
+		srv.ServeError(w, errors.New("E9999 ERROR PAGE REQUESTED"))
 	} else {
 		w.Write([]byte("NOT FOUND"))
 	}
@@ -97,18 +106,23 @@ func (srv *Server) ServeBlogMonth(w http.ResponseWriter, r *http.Request, year i
 
 }
 
-func (srv *Server) ServeBlogPost(w http.ResponseWriter, r *http.Request, year int, month int, title string) {
-	WriteGeneralHeader(w, "a", "")
-	WriteBlogPostBody(w, 123, "Some Blog Post", "coalsgrenier", "Nicolas Grenier", time.Now(), time.Now(), `
-<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi ullamcorper, magna non rutrum mollis, purus metus rhoncus est, ac tempus nisl est et dui. Quisque feugiat semper leo, nec sollicitudin ex porttitor a. Pellentesque et turpis quis sapien elementum pharetra. Nulla tellus enim, ullamcorper sed lectus eu, luctus tempor elit. Quisque lacinia tellus ac dui faucibus maximus. Ut et lacus semper, mollis mauris sit amet, auctor nunc. Nunc nec porttitor leo. Phasellus consequat nulla dui, tristique tincidunt est mollis nec. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Cras posuere non odio a volutpat. Mauris sed rhoncus enim. Morbi vitae elit a sapien tempor vestibulum. Curabitur ullamcorper elit ex, quis pellentesque nulla pellentesque ut.
+func (srv *Server) ServeBlogPost(w http.ResponseWriter, r *http.Request, year int, month int, shortTitle string) {
+	//We first get the id of the post
+	tx, _ := srv.db.Begin()
+	id, err := tx.GetBlogPostNumber(year, month, shortTitle)
+	if err != nil {
+		srv.ServeError(w, err)
+		return
+	}
+	fmt.Printf("BLOG POST ID %d\n", id)
 
-<p>Nulla facilisi. Praesent ullamcorper eget eros quis commodo. Etiam non lobortis nulla. Nullam ut sollicitudin felis. Morbi lacus ante, rutrum a facilisis et, hendrerit ut augue. Curabitur leo risus, pellentesque et rutrum sit amet, sagittis sit amet tortor. Suspendisse sed nulla vel est aliquam mollis ac ac urna. Praesent at nulla mauris. Cras lacinia nulla eget purus vestibulum varius eget ac velit. Sed vel est quis ante hendrerit ultrices vel vitae justo. Donec at orci purus. Suspendisse euismod finibus metus in tempor. Aenean accumsan tincidunt metus, nec pharetra elit vulputate quis.
+	title, authorusername, author, created, modified,  body, err := tx.GetBlogPostBody(id)
+	if err != nil {
+		srv.ServeError(w, err)
+	}
 
-<p>Vestibulum vitae justo viverra, mollis magna et, scelerisque metus. Nunc vel malesuada neque. Sed lacinia laoreet erat quis bibendum. Sed metus massa, bibendum et velit eget, pellentesque porta nisi. Suspendisse tincidunt magna pulvinar nulla dignissim consequat. Interdum et malesuada fames ac ante ipsum primis in faucibus. Aenean maximus tellus et justo viverra fermentum. Cras id justo ultrices, hendrerit sem et, condimentum leo. Etiam id ornare metus. Vivamus blandit at neque ullamcorper sagittis. Vestibulum ultrices bibendum porta. Donec non dictum dolor. Quisque fermentum ligula ut aliquet imperdiet. Curabitur sit amet nisi hendrerit, venenatis mauris sit amet, elementum neque.
-
-<p>Phasellus eleifend nisi mauris, vitae dapibus dui egestas finibus. Phasellus ac lacus ipsum. Cras tristique sapien id turpis aliquet luctus. Praesent et leo volutpat, aliquet lorem non, pulvinar purus. Interdum et malesuada fames ac ante ipsum primis in faucibus. Nullam interdum facilisis enim, non malesuada libero commodo eu. Fusce pulvinar quam tincidunt facilisis sodales. Fusce blandit elit id orci tristique, in condimentum nunc commodo. Cras sed finibus eros. Suspendisse est elit, varius eget feugiat non, scelerisque vel magna. Aliquam in tristique neque, in lacinia mauris. Integer et imperdiet felis, ut semper ex. Duis venenatis porttitor vulputate. Vivamus eu porta nisi, eu convallis quam. Sed at lacus neque.
-
-<p>Praesent aliquam ut leo sit amet volutpat. Sed a est rhoncus, tempor metus sit amet, volutpat neque. Maecenas molestie dictum metus, non porttitor enim pretium in. Maecenas arcu nisl, malesuada in ex vel, aliquet aliquet nisl. Curabitur vel est purus. Suspendisse porta diam lacus, eget scelerisque nisi aliquet a. Quisque ac maximus risus, quis volutpat arcu. Praesent ac turpis quis augue laoreet bibendum vel sed lectus. Nulla commodo urna ac dolor iaculis, sit amet venenatis ipsum congue. In hac habitasse platea dictumst. Vivamus mi urna, egestas malesuada eros ut, condimentum eleifend sapien. Maecenas sodales vulputate risus, at laoreet enim condimentum sit amet. Donec eget lectus suscipit, vulputate nunc vitae, pretium libero. Integer vitae vulputate odio. Interdum et malesuada fames ac ante ipsum primis in faucibus. `, nil, nil)
+	WriteGeneralHeader(w, title, "")
+	WriteBlogPostBody(w, id, title, authorusername, author, created, modified,  body, nil, nil)
 	WriteGeneralTrailer(w)
 }
 
@@ -141,7 +155,10 @@ func (srv *Server) CreateBlogPost(w http.ResponseWriter, r *http.Request) {
 
 }
 
+//Search
+func (srv *Server) ServeSearch(w http.ResponseWriter, r *http.Request) {
 
+}
 
 
 
@@ -149,7 +166,7 @@ func (srv *Server) CreateBlogPost(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	s := &Server{}
-	s.Initialize(4000)
+	s.Initialize(4000, "localhost", 5432, "postgres", "postgres", "www")
 	s.Run()
 }
 
@@ -163,10 +180,30 @@ func main() {
 // S T A T I C   A N D   F I L E    S E R V I N G
 //
 
-func (srv *Server) ServeStatic(w http.ResponseWriter, r *http.Request, file string) {
+func (srv *Server) ServeStatic(w http.ResponseWriter, file string) {
 
 }
 
-func (srv *Server) ServeFile(w http.ResponseWriter, r *http.Request, file string) {
+func (srv *Server) ServeFile(w http.ResponseWriter, file string) {
 
+}
+
+
+//
+// E R R O R S
+//
+func (srv *Server) ServeError(w http.ResponseWriter, err error) {
+	w.WriteHeader(500)
+	WriteError(w, err)
+}
+
+//
+// D E B U G
+//
+func (srv *Server) ServeReflection(w http.ResponseWriter, r *http.Request) {
+	b, e := httputil.DumpRequest(r, true)
+	if e != nil {
+		panic(e)
+	}
+	w.Write(b)
 }

@@ -2,10 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"github.com/mattn/go-sqlite3"
+	"fmt"
+	"time"
+	_ "github.com/lib/pq"
 )
-
-db.NewTransaction()
 
 // Database operation object.
 //
@@ -16,36 +16,45 @@ type Database struct {
 	db *sql.DB
 }
 
-//Connect to the database server.
-func (db Database) Connect(address string, port int, username string, password string, name string) error {
-
-}
-
-//Get a transaction context from the database.
-func (db *Database) Begin() (*Transaction, error) {
-	tx, err := db.BeginTx()
-	return &Transaction{}
-}
-
-
-
-//
 // Transaction object: used to do
-//
 type Transaction struct {
 	tx *sql.Tx
 }
 
-func (tx *Transaction) Exec (query string, args ...Interface{}) (sql.Result, error) {
+//Connect to the database server.
+func (db *Database) Connect(address string, port int, username string, password string, name string) error {
+	d, err := sql.Open("postgres", fmt.Sprintf("postgres://%s:%s@%s/%s", username, password, address, name))
+	if err != nil {
+		return err
+	}
+	db.db = d
+	return nil
+}
+
+//Get a transaction context from the database.
+func (db *Database) Begin() (*Transaction, error) {
+	t, err := db.db.Begin()
+	return &Transaction{tx: t}, err
+}
+
+func (tx *Transaction) Exec(query string, args ...interface{}) (sql.Result, error) {
 	return tx.tx.Exec(query, args...)
 }
 
-func (tx *Transaction) Query(query string, args ...Interface{}) (*sql.Rows, error) {
+func (tx *Transaction) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	return tx.tx.Query(query, args...)
 }
 
-func (tx *Transaction) Query(query string, args ...Interface{}) *sql.Row {
+func (tx *Transaction) QueryRow(query string, args ...interface{}) *sql.Row {
 	return tx.tx.QueryRow(query, args...)
+}
+
+func (tx *Transaction) Commit() error {
+	return tx.tx.Commit()
+}
+
+func (tx *Transaction) Rollback() error {
+	return tx.tx.Rollback()
 }
 
 
@@ -55,11 +64,11 @@ func (tx *Transaction) Query(query string, args ...Interface{}) *sql.Row {
 //
 
 func (tx *Transaction) DoesBlogPostExist(post int) error {
-	tmp int
-	row := db.countBlogPostStmt.QueryRow(post)
+	var tmp int
+	row := tx.QueryRow("SELECT COUNT(*) FROM BLOGPOSTS WHERE NUMBER=$1", post)
 	err := row.Scan(&tmp)
-	if err {
-		return DatabaseError()
+	if err != nil {
+		return DatabaseError(err)
 	}
 	if tmp == 0 {
 		return BlogPostNotFoundError()
@@ -68,226 +77,239 @@ func (tx *Transaction) DoesBlogPostExist(post int) error {
 	}
 }
 
-func (db *Database) GetBlogPostNumber(year int, month int, shorttitle string) (int, error) {
+func (tx *Transaction) GetBlogPostNumber(year int, month int, shorttitle string) (int, error) {
 	//Return value
-	number int
+	var number int
+	var n int = 0
 	//Fetch from the database
-	rows, err := db.getBlogPostFromDateStmt.Query(year, month, shorttitle)
+	rows, err := tx.Query("SELECT NUMBER FROM BLOGPOSTS WHERE YEAR=$1 AND MONTH=$2 AND SHORTTITLE=$3", year, month, shorttitle)
 	if err != nil {
-		return 0, DatabaseError()
+		return 0, DatabaseError(err)
 	}
-	//Check the result
-	if len(rows) == 0 {
-		return 0, BlogPostNotFoundError()
-	} else {
-		//Good result
-		rows[0].Scan(&number)
-		return number, nil
+	for rows.Next() {
+		n += 1
+		err = rows.Scan(&number)
+		if  err != nil {
+			return 0, DatabaseError(err)
+		}
 	}
+	if n != 1 {
+		return 0, RecordNotUniqueError()
+	}
+	return number, nil
 }
 
-//Raw insert: formatting required beforehands (is Draft and not Deleted)
-//Returns post id, error
-func (db Database) InsertBlogPost(
-		deleted bool,
-		draft bool,
-		revision int,
-		author int,
-		created time.Time,
-		modified time.Time,
-		year int,
-		month int,
-		shortTitle string,
-		title string,
-		content string,
-		likeable bool,
-		hidelikes bool,
-		commentable bool,
-		hidecomments bool
-	) (int, error, []Message) {
-
-
-}
-
-func (db *Database) CreateBlogPost() (int, error) {
-	db.Exec("INSERT INTO BLOGPOSTS() RETURNING NUMBER")
-	db.Exec("INSERT INTO BLOGPOSTSOURCES(BLOGPOST, REVISION, FORMATTER, FORMATTERVERSION, SUCCESSFUL, CONTENT, LOG, TIMESTAMP, USERID)")
-}
-
-func (db *Database) EditBlogPost() (error) {
-
-}
-
-//Remove draft flag
-func (db *Database) PublishBlogPost(blogPost id) (error, []Message) {
-
-}
-
-//Mark post as deleted
-func (db *Database) DeleteBlogPost() (error, []Message) {
-	db.Exec("UPDATE BLOGPOSTS SET DELETED=TRUE WHERE NUMBER=?")
-}
-
-func (db *Database) DisableBlogPostCommenting(post int, userid int) {
-	db.Exec("UPDATE BLOGPOSTS SET COMMENTABLE=FALSE WHERE NUMBER=?")
-}
-
-func (db *Database) HideBlogPostComments(post int, userid int) {
-	db.Exec("UPDATE BLOGPOSTS SET HIDECOMMENTS=TRUE WHERE NUMBER=?")
-}
-
-//Prevent new likes
-func (db *Database) DisableBlogPostLiking(post int, userid int) {
-	db.Exec("UPDATE BLOGPOSTS SET LIKEABLE=FALSE WHERE NUMBER=?")
-}
-
-//Hide existing likes
-func (db *Database) HideBlogPostLikes(post int, userid int) {
-	db.Exec("UPDATE BLOGPOSTS SET HIDELIKES=TRUE WHERE NUMBER=?")
-}
-
-
+// //Raw insert: formatting required beforehands (is Draft and not Deleted)
+// //Returns post id, error
+// func (tx *Transaction) InsertBlogPost(
+// 		deleted bool,
+// 		draft bool,
+// 		revision int,
+// 		author int,
+// 		created time.Time,
+// 		modified time.Time,
+// 		year int,
+// 		month int,
+// 		shortTitle string,
+// 		title string,
+// 		content string,
+// 		likeable bool,
+// 		hidelikes bool,
+// 		commentable bool,
+// 		hidecomments bool) (int, error) {
+// }
 //
-//  B L O G   P O S T   L I K E S
+// //func (tx *Transaction) CreateBlogPost() (int, error) {
+// //	tx.Exec("INSERT INTO BLOGPOSTS() RETURNING NUMBER")
+// //	tx.Exec("INSERT INTO BLOGPOSTSOURCES(BLOGPOST, REVISION, FORMATTER, FORMATTERVERSION, SUCCESSFUL, CONTENT, LOG, TIMESTAMP, USERID)")
+// //}
 //
-
-//Get the number of likes on a post
-func (db *Database) CountBlogPostLikes(post int) (int, error, []Message) {
-	//We first check that the post exists
-}
-
-//Like Post
-func (db Database) LikeBlogPost() (error, []Message) {
-
-}
-
-//Unlike Post
-func (db *Database) UnlikeBlogPost() {
-
-}
-
-
-
+// func (tx *Transaction) EditBlogPost() (error) {
+// }
 //
-//  B L O G   P O S T   C O M M E N T S
+// //Remove draft flag
+// func (tx *Transaction) PublishBlogPost(blogPost id) (error) {
+// 	return nil
+// }
 //
-
-//Raw insert, returns comment id
-func (db *Database) insertBlogPostComment() (int, error, []Message) {
-
-}
-
-//Raw insert, returns comment revision id
-func (db *Database) insertBlogPostCommentSource() (int, error, []Message) {
-
-}
-
-//Comment Post, returns absolute comment id
-func (db Database) CommentBlogPost() (int, error, []Message) {
-
-}
-
-//Update Comment
-func (db Database) EditBlogPostComment() (error, []Message) {
-
-}
-
-//Remove Comment (username needed for access control)
-func (db Database) RemoveBlogPostComment(comment int, userid int) (error, []Message) {
-
-}
-
+// //Mark post as deleted
+// func (tx *Transaction) DeleteBlogPost() (error) {
+// 	tx.Exec("UPDATE BLOGPOSTS SET DELETED=TRUE WHERE NUMBER=?")
+// }
 //
-//   B L O G   P O S T   C O M M E N T   L I K E S
+// func (tx *Transaction) DisableBlogPostCommenting(post int, userid int) {
+// 	tx.Exec("UPDATE BLOGPOSTS SET COMMENTABLE=FALSE WHERE NUMBER=?")
+// }
 //
-
-//Like Comment
-func (db Database) LikeBlogPostComment(comment int, userid int) (error, []Message) {
-
-}
-
-//Unlike Comment
-func (db Database) UnlikeBlogPostComment (comment int, userid int) (error, []Message) {
-
-}
-
-
-
+// func (tx *Transaction) HideBlogPostComments(post int, userid int) {
+// 	tx.Exec("UPDATE BLOGPOSTS SET HIDECOMMENTS=TRUE WHERE NUMBER=?")
+// }
 //
-// U S E R   P R O F I L E S
+// //Prevent new likes
+// func (tx *Transaction) DisableBlogPostLiking(post int, userid int) {
+// 	tx.Exec("UPDATE BLOGPOSTS SET LIKEABLE=FALSE WHERE NUMBER=?")
+// }
 //
-
-//Create user profile, return user id.
-func (tx *Transaction) CreateUserProfile (userName string, firstName string, middleNames string, lastName string, email string) (int, error, []Message) {
-
-}
-
-//Check user/password, returns user id
-func (tx *Transaction) CheckAuthentication (username string, password string) (int, error, []Message) {
-
-}
-
-//Change password
-func (tx *Transaction) ChangePassword (target id, newPassword string, userid int) (error, []Message) {
-
-}
-
-//Change user name (userid for access control)
-func (tx *Transaction) ChangeUserName (target id, newUserName string, userid id) (error, []Message) {
-
-}
-
-//Change user names
-func (tx *Transaction) ChangeUserNames (target id, newFirstName string, newMiddleNames string, newLastName string, userid int) (error, []Message) {
-
-}
-
-//Make the user <target> a moderator.
-func (tx *Transaction) MakeUserModerator(target int, changer int) {
-
-}
-
+// //Hide existing likes
+// func (tx *Transaction) HideBlogPostLikes(post int, userid int) {
+// 	tx.Exec("UPDATE BLOGPOSTS SET HIDELIKES=TRUE WHERE NUMBER=?")
+// }
+//
+//
+// //
+// //  B L O G   P O S T   L I K E S
+// //
+//
+// //Get the number of likes on a post
+// func (tx *Transaction) CountBlogPostLikes(post int) (int, error) {
+// 	//We first check that the post exists
+// 	return nil
+// }
+//
+// //Like Post
+// func (tx *Transaction) LikeBlogPost() (error) {
+//
+// }
+//
+// //Unlike Post
+// func (tx *Transaction) UnlikeBlogPost() {
+//
+// }
+//
+//
+//
+// //
+// //  B L O G   P O S T   C O M M E N T S
+// //
+//
+// //Raw insert, returns comment id
+// func (tx *Transaction) insertBlogPostComment() (int, error) {
+//
+// }
+//
+// //Raw insert, returns comment revision id
+// func (tx *Transaction) insertBlogPostCommentSource() (int, error) {
+//
+// }
+//
+// //Comment Post, returns absolute comment id
+// func (tx *Transaction) CommentBlogPost() (int, error) {
+//
+// }
+//
+// //Update Comment
+// func (tx *Transaction) EditBlogPostComment() (error, ) {
+//
+// }
+//
+// //Remove Comment (username needed for access control)
+// func (tx *Transaction) RemoveBlogPostComment(comment int, userid int) (error) {
+//
+// }
+//
+// //
+// //   B L O G   P O S T   C O M M E N T   L I K E S
+// //
+//
+// //Like Comment
+// func (tx *Transaction) LikeBlogPostComment(comment int, userid int) (error) {
+//
+// }
+//
+// //Unlike Comment
+// func (tx *Transaction) UnlikeBlogPostComment (comment int, userid int) (error) {
+//
+// }
+//
+//
+//
+// //
+// // U S E R   P R O F I L E S
+// //
+//
+// //Create user profile, return user id.
+// func (tx *Transaction) CreateUserProfile (userName string, firstName string, middleNames string, lastName string, email string) (int, error) {
+//
+// }
+//
+// //Check user/password, returns user id
+// func (tx *Transaction) CheckAuthentication (username string, password string) (int, error) {
+//
+// }
+//
+// //Change password
+// func (tx *Transaction) ChangePassword (target id, newPassword string, userid int) (error) {
+//
+// }
+//
+// //Change user name (userid for access control)
+// func (tx *Transaction) ChangeUserName (target id, newUserName string, userid id) (error) {
+//
+// }
+//
+// //Change user names
+// func (tx *Transaction) ChangeUserNames (target id, newFirstName string, newMiddleNames string, newLastName string, userid int) (error) {
+//
+// }
+//
+// //Make the user <target> a moderator.
+// func (tx *Transaction) MakeUserModerator(target int, changer int) {
+//
+// }
+//
 //
 // These functions act on a database as they are not transactional.
 //
 
-//Get a blog post.
-//
-//Returns BLOGPOST {
-//	"id" : integer number
-//	"path" : /year/month/shorttitle
-//	"authorid": author id
-//	"author": author name
-//	"created" create date&time
-//	"modified" : datetime or nil
-//	"canedit" : whether the current user can edit
-//	"ncomments" number of comments
-//	"nlikes" number of likes
-//	"canlike" whether we can like
-//	"cancomment" whether we can comment
-//	"comments" {
-//		"id" number of the comment (database)
-//		"seq" sequence number of comment (always in order)
-//		"userid" userif of creator
-//		"username" username of creator
-//		"inreplyto" sequence number of comment in reply to
-//		"inreplytouserid" userid of the user in reply to
-//		"inreplytouser" username of user which is being replied to
-//		"nreplies" the number of replies
-//		"nlikes" the number of likes
-//		"canlike"
-//		"canedit"
-//		"canreply"
-//		"replies" {
-//			"id" unique id of the reply
-//			"seq" seq number of the reply
-//			"username" username of the replier
-//}
-//}
-//}
-//set includecomments to false to not get the comments (only ncomments)
-func (db *Database) GetBlogPost(number int, includeComments boolean) (error) {
-
-	db.QueryRow("SELECT ")
-
+//Get the user
+func (tx *Transaction) GetBlogPostBody(post int) (title string, authorusername string, author string, created time.Time, modified time.Time, body string, err error) {
+	row := tx.QueryRow("SELECT TITLE, USERNAME, FIRSTNAME || ' ' || LASTNAME, BLOGPOSTS.CREATED, MODIFIED, CONTENT FROM BLOGPOSTS LEFT JOIN USERS ON AUTHOR=USERS.NUMBER WHERE BLOGPOSTS.NUMBER=$1", post)
+	e := row.Scan(&title, &authorusername, &author, &created, &modified, &body)
+	if e != nil {
+		err = DatabaseError(e)
+	} else {
+		err = nil
+	}
+	return
 }
+
+// //Get a blog post.
+// //
+// //Returns BLOGPOST {
+// //	"id" : integer number
+// //	"path" : /year/month/shorttitle
+// //	"authorid": author id
+// //	"author": author name
+// //	"created" create date&time
+// //	"modified" : datetime or nil
+// //	"canedit" : whether the current user can edit
+// //	"ncomments" number of comments
+// //	"nlikes" number of likes
+// //	"canlike" whether we can like
+// //	"cancomment" whether we can comment
+// //	"comments" {
+// //		"id" number of the comment (database)
+// //		"seq" sequence number of comment (always in order)
+// //		"userid" userif of creator
+// //		"username" username of creator
+// //		"inreplyto" sequence number of comment in reply to
+// //		"inreplytouserid" userid of the user in reply to
+// //		"inreplytouser" username of user which is being replied to
+// //		"nreplies" the number of replies
+// //		"nlikes" the number of likes
+// //		"canlike"
+// //		"canedit"
+// //		"canreply"
+// //		"replies" {
+// //			"id" unique id of the reply
+// //			"seq" seq number of the reply
+// //			"username" username of the replier
+// //}
+// //}
+// //}
+// //set includecomments to false to not get the comments (only ncomments)
+// func (db *Database) GetBlogPost(number int, includeComments boolean) (error) {
+//
+// 	db.QueryRow("SELECT ")
+//
+// }

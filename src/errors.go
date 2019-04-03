@@ -2,7 +2,13 @@
 // Error type definition
 //
 
-typedef Error struct {
+package main
+
+import (
+	"fmt"
+)
+
+type Error struct {
 	number	int
 	text	string
 }
@@ -11,12 +17,12 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("E%04d %s.", e.number, e.text)
 }
 
-typedef Message struct {
+type Message struct {
 	number	int
 	text	string
 }
 
-funct (m *Message) Message() string {
+func (m *Message) Message() string {
 	return fmt.Sprintf("I%04d %s.", m.number, m.text)
 }
 
@@ -30,12 +36,12 @@ funct (m *Message) Message() string {
 // Global Error
 //
 
-func ErrorUnknown () error {
-	return &Error{1, "UNKNOWN ERROR"}
+func ErrorUnknown (err error) error {
+	return &Error{1, fmt.Sprintf("UNKNOWN ERROR '%s'", err.Error())}
 }
 
-func DatabaseError () error {
-	return &Error{5, "DATABASE ERROR"}
+func DatabaseError (err error) error {
+	return &Error{5, fmt.Sprintf("DATABASE ERROR '%s'", err.Error())}
 }
 
 func RecordNotUniqueError() error {
@@ -52,7 +58,7 @@ func NotLoggedInError() error {
 }
 
 func InvalidCredentialsError() error {
-	return &Error(11, "INVALID CREDENTIALS")
+	return &Error{11, "INVALID CREDENTIALS"}
 }
 
 func SessionExpiredError() error {
@@ -63,15 +69,15 @@ func AccountLockedError() error {
 	return &Error{14, "ACCOUNT LOCKED"}
 }
 
-func AccountLockWarning(num int) Message {
-	return &Error(16, "ACCOUNT WILL BE LOCKED AFTER %d FURTHER UNSUCCESSFUL LOG-IN ATTEMPTS")
+func AccountLockWarning(num int) *Message {
+	return &Message{16, "ACCOUNT WILL BE LOCKED AFTER %d FURTHER UNSUCCESSFUL LOG-IN ATTEMPTS"}
 }
 
-func PreviousBadAttempsMessage(num int) Message {
+func PreviousBadAttempsMessage(num int) *Message {
 	return &Message{18, "%d PREVIOUS BAD LOG-IN ATTEMPTS"}
 }
 
-func PasswordWillExpireSoonMessage() Message {
+func PasswordWillExpireSoonMessage() *Message {
 	return &Message{19, "PASSWORD WILL SOON EXPIRE"}
 }
 
@@ -123,14 +129,14 @@ func FormatterError (error string) error {
 // Search Errors
 //
 
-func SearchResultsTooLargeStripped() Message {
+func SearchResultsTooLargeStripped() *Message {
 	return &Message{2011, "SEARCH RESULTS TOO LARGE SO STRIPPED"}
 }
 
-func SearchTooLongStrippedMessage () Message {
+func SearchTooLongStrippedMessage () *Message {
 	return &Message{2019, "SEARCH TOO LONG EXTRA CHARACTERS REMOVED"}
 }
 
-func SearchEscapeCharactersRemovedMessage () Message {
+func SearchEscapeCharactersRemovedMessage () *Message {
 	return &Message{2021, "ESCAPE CHARACTERS IN SEARCH STRIPPED"}
 }
