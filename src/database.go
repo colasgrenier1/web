@@ -99,6 +99,77 @@ func (tx *Transaction) GetBlogPostNumber(year int, month int, shorttitle string)
 	return number, nil
 }
 
+func (tx *Transaction) GetBlogPostsForMonth(year int, month int) ([]int, error) {
+	rows, err := tx.Query("SELECT NUMBER FROM BLOGPOSTS WHERE YEAR=$1 AND MONTH=$2", year, month)
+	if err != nil {
+		return nil, DatabaseError(err)
+	}
+	var ids []int
+	for rows.Next() {
+		var number int
+		rows.Scan(&number)
+		ids = append(ids, number)
+	}
+	return ids, nil
+}
+
+func (tx *Transaction) GetPreviousBlogYear(year int) (int, error) {
+	return 0, nil
+}
+
+func (tx *Transaction) GetNextBlogYear(year int) (int, error) {
+	return 0, nil
+}
+
+func (tx *Transaction) GetPreviousBlogYearMonth(year int, month int) (int, int, error) {
+	var defval int = 999999
+	var y int = defval
+	var m int = defval
+	var ytmp int
+	var mtmp int
+	rows, err := tx.Query("SELECT YEAR, MONTH FROM BLOGPOSTS WHERE YEAR<=$1 AND MONTH<$2", year, month)
+	if err != nil {
+		return 0, 0, DatabaseError(err)
+	}
+	for rows.Next() {
+		rows.Scan(&ytmp, &mtmp)
+		if ytmp>y || (ytmp==y && mtmp>m) {
+			y = ytmp
+			m = mtmp
+		}
+	}
+	if y==defval {
+		return 0, 0, nil
+	} else {
+		return y, m, nil
+	}
+}
+
+
+func (tx *Transaction) GetNextBlogYearMonth(year int, month int) (int, int, error) {
+	var defval int = 999999
+	var y int = defval
+	var m int = defval
+	var ytmp int
+	var mtmp int
+	rows, err := tx.Query("SELECT YEAR, MONTH FROM BLOGPOSTS WHERE YEAR>=$1 AND MONTH>$2", year, month)
+	if err != nil {
+		return 0, 0, DatabaseError(err)
+	}
+	for rows.Next() {
+		rows.Scan(&ytmp, &mtmp)
+		if ytmp<y || (ytmp==y && mtmp<m) {
+			y = ytmp
+			m = mtmp
+		}
+	}
+	if y==defval {
+		return 0, 0, nil
+	} else {
+		return y, m, nil
+	}
+}
+
 // //Raw insert: formatting required beforehands (is Draft and not Deleted)
 // //Returns post id, error
 // func (tx *Transaction) InsertBlogPost(
@@ -262,9 +333,9 @@ func (tx *Transaction) GetBlogPostNumber(year int, month int, shorttitle string)
 //
 
 //Get the user
-func (tx *Transaction) GetBlogPostBody(post int) (title string, authorusername string, author string, created time.Time, modified time.Time, body string, err error) {
-	row := tx.QueryRow("SELECT TITLE, USERNAME, FIRSTNAME || ' ' || LASTNAME, BLOGPOSTS.CREATED, MODIFIED, CONTENT FROM BLOGPOSTS LEFT JOIN USERS ON AUTHOR=USERS.NUMBER WHERE BLOGPOSTS.NUMBER=$1", post)
-	e := row.Scan(&title, &authorusername, &author, &created, &modified, &body)
+func (tx *Transaction) GetBlogPostBody(post int) (title string, shorttitle string, authorusername string, author string, created time.Time, modified time.Time, body string, err error) {
+	row := tx.QueryRow("SELECT TITLE, SHORTTITLE, USERNAME, FIRSTNAME || ' ' || LASTNAME, BLOGPOSTS.CREATED, MODIFIED, CONTENT FROM BLOGPOSTS LEFT JOIN USERS ON AUTHOR=USERS.NUMBER WHERE BLOGPOSTS.NUMBER=$1", post)
+	e := row.Scan(&title, &shorttitle, &authorusername, &author, &created, &modified, &body)
 	if e != nil {
 		err = DatabaseError(e)
 	} else {
@@ -313,3 +384,8 @@ func (tx *Transaction) GetBlogPostBody(post int) (title string, authorusername s
 // 	db.QueryRow("SELECT ")
 //
 // }
+
+//Dump the database to a file, using postgres dump
+func (tx *Transaction) Dump(outputfile string) error {
+
+}

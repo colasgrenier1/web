@@ -25,6 +25,7 @@ func WriteGeneralHeader(w http.ResponseWriter, title string, username string) {
 		<LINK REL="stylesheet" HREF="/static/style.css">
 		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 		<link href="https://fonts.googleapis.com/css?family=IBM+Plex+Serif:400,400i,700&amp;subset=latin-ext" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans" rel="stylesheet">
 	</HEAD>
 	<BODY>
 		<DIV CLASS="mainframe">
@@ -46,7 +47,7 @@ func WriteGeneralHeader(w http.ResponseWriter, title string, username string) {
 				}
 			</SCRIPT>
 			<DIV CLASS="header">
-				<H1 CLASS="headertitle">NICOLAS GRENIER</H1>
+				<A HREF="/" CLASS="headertitle"><H1 CLASS="headertitle">NICOLAS GRENIER</H1></A>
 				<DIV CLASS="headernavbar" ID="headernavbar">
 					<A HREF="/" CLASS="active">HOME</A>
 					<A HREF="/blog">BLOG</A>
@@ -96,8 +97,9 @@ func WriteError(w http.ResponseWriter, err error) {
 	b.WriteString("</HEAD>\n<BODY>\n")
 	b.WriteString("<DIV CLASS=\"errorcontainer\">\n")
 	b.WriteString("<H1>* * *  ERROR  * * *</H1>")
-	b.WriteString("<P>One or more errors occured while fetching the ressource.</P>\n")
+	b.WriteString("<P>One or more errors occured while fetching the requested ressource:</P>\n")
 	b.WriteString(fmt.Sprintf("<P CLASS=\"errorline\">%s</P>\n",err.Error()))
+	b.WriteString("<P><A HREF=\"/\">RETURN HOME</A></P>\n")
 	b.WriteString("</DIV>\n</BODY>\n</HTML>")
 	w.Write(b.Bytes())
 }
@@ -113,19 +115,65 @@ func WriteBlogPostBody(w http.ResponseWriter, id int, title string, username str
 	w.Write(b.Bytes())
 }
 
+func WriteBlogPostBodyOverview(w http.ResponseWriter, id int, shorttitle string, title string, username string, name string, created time.Time, modified time.Time, body string, errors []string, messages []string) {
+	var b bytes.Buffer
+	b.WriteString("<DIV CLASS=\"blogpostbodyoverview\">\n")
+	y, m, _ := created.Date()
+	b.WriteString(fmt.Sprintf("<A HREF=\"/%04d/%02d/%s\"><H1>%s</H1></A>\n", y, m, shorttitle, title))
+	b.WriteString(fmt.Sprintf("<P CLASS=\"byline\">By %s</P>\n",name))
+	b.WriteString(body)
+	b.WriteString(fmt.Sprintf(""))
+	b.WriteString("</DIV>\n")
+	w.Write(b.Bytes())
+}
+
+func WriteBlogPostPreviousNextMonth(w http.ResponseWriter, pyear int, pmonth int, nyear int, nmonth int) {
+	var b bytes.Buffer
+	b.WriteString("<DIV CLASS=\"blogpostpreviousnextmonth\">\n")
+	if pyear > 0 && pmonth > 0 {
+		b.WriteString(fmt.Sprintf("<A STYLE=\"float:left\" HREF=\"/%d/%02d\">Previous Month</A>", pyear, pmonth))
+	}
+	if nyear > 0 && nmonth > 0 {
+		b.WriteString(fmt.Sprintf("<A STYLE=\"float:right\" HREF=\"/%d/%02d\">Next Month</A>", nyear, nmonth))
+	}
+	b.WriteString("</DIV>\n")
+	w.Write(b.Bytes())
+}
+
 //Writes out the comments
 func WriteBlogPostComments() {
 
 }
 
-//Writes out a summary x likes n comments
-func WriteBlogPostCommentSummary() {
-
-}
-
 //Write out the login screen.
 func WriteLoginScreen(w http.ResponseWriter, username string, errors []string, messages []string) {
+	var b bytes.Buffer
+	b.WriteString("<!DOCTYPE HTML>\n<HTML>\n<HEAD>\n<TITLE>LOGIN</TITLE>\n")
+	b.WriteString("<LINK REL=\"stylesheet\" HREF=\"/static/style.css\">")
+	b.WriteString("</HEAD>\n<BODY>\n")
+	b.WriteString("<DIV CLASS=\"logincontainer\" ALIGN=\"center\">\n")
+	//Write form
+	b.WriteString("<FORM CLASS=\"loginform\" ACTION=\"/login\" METHOD=\"post\">\n")
+	b.WriteString("<H1>LOGIN</H1>\n")
+	b.WriteString("<input type=\"text\" name=\"username\" placeholder=\"username\">\n")
+	b.WriteString("<input type=\"password\" name=\"password\" placeholder=\"password\">\n")
+	b.WriteString("<input type=\"submit\" value=\"Log In\">\n")
+	b.WriteString("</FORM>\n")
+	b.WriteString("</DIV>\n</BODY>\n</HTML>")
+	w.Write(b.Bytes())
+}
 
+func WriteUploadFile(w http.ResponseWriter, filename string, errors []string, messages []string) {
+	var b bytes.Buffer
+	b.WriteString("<DIV CLASS=\"uploadfilecontainer\">\n")
+	b.WriteString("<FORM ENCTYPE=\"multipart/form-data\" ACTION=\"/uploadfile\" METHOD=\"post\">\n")
+	b.WriteString("<LABEL FOR=\"filename\">Filename:</LABEL><BR>\n")
+	b.WriteString("<INPUT TYPE=\"text\" ID=\"filename\" NAME=\"filename\"><BR>\n")
+	b.WriteString("<INPUT TYPE=\"file\" ID=\"file\" NAME=\"file\"><BR>\n")
+	b.WriteString("<INPUT TYPE=\"submit\" VALUE=\"UPLOAD\">\n")
+	b.WriteString("</FORM>\n")
+	b.WriteString("</DIV>\n")
+	w.Write(b.Bytes())
 }
 
 //Write out the blog post creation form.

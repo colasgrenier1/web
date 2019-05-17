@@ -48,6 +48,10 @@ func RecordNotUniqueError() error {
 	return &Error{6, "MULTIPLE RECORDS RETURNED WHERE ONLY ONE IS EXPECTED"}
 }
 
+func NotImplementedError() error {
+	return &Error{9, "NOT IMPLEMENTED"}
+}
+
 
 //
 // Session errors/messages PREFIX=10

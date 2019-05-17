@@ -14,6 +14,9 @@ import (
 	"strconv"
 	//"time"
 	"errors"
+	"strings"
+	"os"
+	"io"
 )
 
 //Static regexes for dispatching
@@ -26,10 +29,14 @@ var textRegex = regexp.MustCompile(``)
 type Server struct {
 	db *Database
 	srv *http.Server
+	staticDirectory string
+	fileDirectory string
 }
 
-func (srv *Server) Initialize(port int, databasePath string, databasePort int, username string, password string, database string) error {
+func (srv *Server) Initialize(port int, databasePath string, databasePort int, username string, password string, database string, staticDirectory string, fileDirectory string) error {
 	//We are our own handler
+	srv.staticDirectory = staticDirectory
+	srv.fileDirectory = fileDirectory
 	srv.srv = &http.Server{Addr: fmt.Sprintf(":%d", port), Handler: srv}
 	srv.db = &Database{}
 	return srv.db.Connect(databasePath, databasePort, username, password, database)
@@ -41,6 +48,7 @@ func (srv *Server) Run() error {
 
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var s []string
+	var p string
 
 	method := r.Method
 	path := r.URL.Path
@@ -54,39 +62,61 @@ func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		srv.ServeHomePage(w, r)
 	} else if s=blogPostRegex.FindStringSubmatch(path); method=="GET" && len(s)>1 {
 		fmt.Printf("SERVING BLOG POST <%v>\n", s)
-		switch len(s) {
-			case 2:
-				y, _ := strconv.Atoi(s[1])
-				srv.ServeBlogYear(w, r, y)
-			case 3:
-				y, _ := strconv.Atoi(s[1])
-				m, _ := strconv.Atoi(s[2])
-				srv.ServeBlogMonth(w, r, y, m)
-			case 4:
-				fmt.Println("YEAR-MONTH-TITLE")
-				y, _ := strconv.Atoi(s[1])
-				m, _ := strconv.Atoi(s[2])
-				st := s[3]
-				srv.ServeBlogPost(w, r, y, m, st)
+		if s[3] != "" {
+			fmt.Println("YEAR-MONTH-TITLE")
+			y, _ := strconv.Atoi(s[1])
+			m, _ := strconv.Atoi(s[2])
+			st := s[3]
+			srv.ServeBlogPost(w, r, y, m, st)
+		} else if s[2] != "" {
+			fmt.Println("YEAR-MONTH")
+			y, _ := strconv.Atoi(s[1])
+			m, _ := strconv.Atoi(s[2])
+			srv.ServeBlogMonth(w, r, y, m)
+		} else {
+			fmt.Println("YEAR")
+			y, _ := strconv.Atoi(s[1])
+			srv.ServeBlogYear(w, r, y)
 		}
-	} else if s=fileRegex.FindStringSubmatch(path); method=="GET" && len(s)>0 {
-		fmt.Printf("SERVING FILE <%s>\n", s[1])
+	//} else if s=fileRegex.FindStringSubmatch(path); method=="GET" && len(s)>0 {
+	} else if p=strings.TrimPrefix(path, "/file/"); p!=path {
+		fmt.Printf("SERVING FILE <%s>\n", p)
 		//srv.ServeFile(w, r, s[1])
-	} else if s=staticRegex.FindStringSubmatch(path); method=="GET" && len(s)>0 {
-		fmt.Printf("SERVING STATIC FILE <%v>\n", s)
+	//} else if s=staticRegex.FindStringSubmatch(path); method=="GET" && len(s)>0 {
+		http.ServeFile(w, r, fmt.Sprintf("%s/%s", srv.fileDirectory, s[1]))
+	} else if p=strings.TrimPrefix(path, "/static/"); p!=path {
+		fmt.Printf("SERVING STATIC FILE <%v>\n", p)
+		fmt.Printf("%s/%s", srv.staticDirectory, p)
 		//srv.ServeStatic(w, r, s[1])
-		http.ServeFile(w, r, fmt.Sprintf("/home/nicolas/www/static/%s", s[1]))
+		//http.ServeFile(w, r, fmt.Sprintf("/home/nicolas/www/static/%s", s[1]))
+		http.ServeFile(w, r, fmt.Sprintf("%s/%s", srv.staticDirectory, p))
 	} else if method=="GET" && path=="/newblogpost" {
 		srv.ServeNewBlogPost(w, r)
 	} else if method=="POST" && path=="/newblogpost" {
-		srv.ServeReflection(w, r)
-		//srv.CreateBlogPost(w, r)
+		srv.CreateBlogPost(w, r)
+	} else if method=="GET" && path=="/uploadfile" {
+		srv.ServeUploadFile(w, r)
+	} else if method=="POST" && path=="/uploadfile" {
+		srv.UploadFile(w, r)
+	} else if path == "/login" {
+		srv.ServeLogin(w, r)
+	} else if path == "/disclaimer" {
+
+	} else if path == "/contact" {
+
+	} else if path == "/about" {
+
 	} else if method=="POST" && path=="/newblogpostcomment" {
+		srv.ServeError(w, NotImplementedError())
 	} else if method=="POST" && path=="/likeblogpost" {
+		srv.ServeError(w, NotImplementedError())
 	} else if (method=="GET"||method=="POST") && path=="/editblogpost" {
+		srv.ServeError(w, NotImplementedError())
 	} else if method=="POST" && path=="/likeblogpost" {
+		srv.ServeError(w, NotImplementedError())
 	} else if method=="POST" && path=="/search" {
-		srv.ServeSearch(w, r)
+		srv.ServeError(w, NotImplementedError())
+		//srv.ServeSearch(w, r)
 	} else if path=="/error" {
 		srv.ServeError(w, errors.New("E9999 ERROR PAGE REQUESTED"))
 	} else {
@@ -103,6 +133,30 @@ func (srv *Server) ServeBlogYear(w http.ResponseWriter, r *http.Request, year in
 }
 
 func (srv *Server) ServeBlogMonth(w http.ResponseWriter, r *http.Request, year int, month int) {
+	tx, _ := srv.db.Begin()
+	//Returns
+	postids, err := tx.GetBlogPostsForMonth(year, month)
+	if err != nil {
+		srv.ServeError(w, err)
+		return
+	}
+	fmt.Printf("BLOG POST PER MONTH %04d/%02d\n", year, month)
+
+	WriteGeneralHeader(w, fmt.Sprintf("Blog Posts for %d/%02d", year, month), "")
+
+	for _, id := range postids {
+		title, shorttitle, authorusername, author, created, modified, body, _ := tx.GetBlogPostBody(id)
+		WriteBlogPostBodyOverview(w, id, shorttitle, strings.ToUpper(title), authorusername, author, created, modified,  body, nil, nil)
+	}
+
+	pyear, pmonth, err := tx.GetPreviousBlogYearMonth(year, month)
+	nyear, nmonth, err := tx.GetNextBlogYearMonth(year, month)
+
+	fmt.Printf("%d %d %d %d", pyear, pmonth, nyear, nmonth)
+
+	WriteBlogPostPreviousNextMonth(w, pyear, pmonth, nyear, nmonth)
+
+	WriteGeneralTrailer(w)
 
 }
 
@@ -116,13 +170,13 @@ func (srv *Server) ServeBlogPost(w http.ResponseWriter, r *http.Request, year in
 	}
 	fmt.Printf("BLOG POST ID %d\n", id)
 
-	title, authorusername, author, created, modified,  body, err := tx.GetBlogPostBody(id)
+	title, _, authorusername, author, created, modified,  body, err := tx.GetBlogPostBody(id)
 	if err != nil {
 		srv.ServeError(w, err)
 	}
 
 	WriteGeneralHeader(w, title, "")
-	WriteBlogPostBody(w, id, title, authorusername, author, created, modified,  body, nil, nil)
+	WriteBlogPostBody(w, id, strings.ToUpper(title), authorusername, author, created, modified,  body, nil, nil)
 	WriteGeneralTrailer(w)
 }
 
@@ -131,7 +185,35 @@ func (srv *Server) ServeBlogPost(w http.ResponseWriter, r *http.Request, year in
 //
 
 func (srv *Server) ServeLogin(w http.ResponseWriter, r *http.Request) {
+	WriteLoginScreen(w, "", nil, nil)
+}
 
+func (srv *Server) ServeUploadFile(w http.ResponseWriter, r *http.Request) {
+	WriteGeneralHeader(w, "Upload File", "")
+	WriteUploadFile(w, "", nil, nil)
+	WriteGeneralTrailer(w)
+}
+
+func (srv *Server) UploadFile(w http.ResponseWriter, r *http.Request) {
+	r.ParseMultipartForm(10000000)
+	fmt.Println(r.Form["filename"])
+	filename := r.Form["filename"]
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	defer file.Close()
+	target, err := os.OpenFile(fmt.Sprintf("%s/%s", srv.fileDirectory, filename), os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		WriteError(w, err)
+		return
+	}
+	defer target.Close()
+	io.Copy(target, file)
+	WriteGeneralHeader(w, "Upload File", "")
+	WriteUploadFile(w, "", nil, nil)
+	WriteGeneralTrailer(w)
 }
 
 func (srv *Server) ServeLoginPOST(w http.ResponseWriter, r *http.Request) {
@@ -166,7 +248,7 @@ func (srv *Server) ServeSearch(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	s := &Server{}
-	s.Initialize(4000, "localhost", 5432, "postgres", "postgres", "www")
+	s.Initialize(4000, "localhost", 5432, "postgres", "postgres", "www", "/home/nicolas/www/static", "/home/nicolas/www/file")
 	s.Run()
 }
 
